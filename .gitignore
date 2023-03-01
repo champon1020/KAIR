@@ -1,0 +1,5 @@
+**/__pycache__
+trainsets/solafune_train/*
+testsets/solafune_test/*
+
+superresolution
