@@ -1,21 +1,22 @@
+import glob
+import io
+import math
 import os
+import random
+import sys
+from collections import OrderedDict
+from os import path as osp
+from pathlib import Path
+
+import av
 import cv2
 import numpy as np
-import torch
-import random
-from os import path as osp
-from torchvision.utils import make_grid
-import sys
-from pathlib import Path
 import six
-from collections import OrderedDict
-import math
-import glob
-import av
-import io
+import torch
 from cv2 import (CAP_PROP_FOURCC, CAP_PROP_FPS, CAP_PROP_FRAME_COUNT,
                  CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
                  CAP_PROP_POS_FRAMES, VideoWriter_fourcc)
+from torchvision.utils import make_grid
 
 if sys.version_info <= (3, 3):
     FileNotFoundError = IOError
@@ -37,7 +38,7 @@ def fopen(filepath, *args, **kwargs):
         return open(filepath, *args, **kwargs)
     elif isinstance(filepath, Path):
         return filepath.open(*args, **kwargs)
-    raise ValueError('`filepath` should be a string or a Path')
+    raise ValueError("`filepath` should be a string or a Path")
 
 
 def check_file_exist(filename, msg_tmpl='file "{}" does not exist'):
@@ -46,7 +47,7 @@ def check_file_exist(filename, msg_tmpl='file "{}" does not exist'):
 
 
 def mkdir_or_exist(dir_name, mode=0o777):
-    if dir_name == '':
+    if dir_name == "":
         return
     dir_name = osp.expanduser(dir_name)
     os.makedirs(dir_name, mode=mode, exist_ok=True)
@@ -80,33 +81,34 @@ def scandir(dir_path, suffix=None, recursive=False, case_sensitive=True):
         raise TypeError('"suffix" must be a string or tuple of strings')
 
     if suffix is not None and not case_sensitive:
-        suffix = suffix.lower() if isinstance(suffix, str) else tuple(
-            item.lower() for item in suffix)
+        suffix = (
+            suffix.lower()
+            if isinstance(suffix, str)
+            else tuple(item.lower() for item in suffix)
+        )
 
     root = dir_path
 
     def _scandir(dir_path, suffix, recursive, case_sensitive):
         for entry in os.scandir(dir_path):
-            if not entry.name.startswith('.') and entry.is_file():
+            if not entry.name.startswith(".") and entry.is_file():
                 rel_path = osp.relpath(entry.path, root)
                 _rel_path = rel_path if case_sensitive else rel_path.lower()
                 if suffix is None or _rel_path.endswith(suffix):
                     yield rel_path
             elif recursive and os.path.isdir(entry.path):
                 # scan recursively if entry.path is a directory
-                yield from _scandir(entry.path, suffix, recursive,
-                                    case_sensitive)
+                yield from _scandir(entry.path, suffix, recursive, case_sensitive)
 
     return _scandir(dir_path, suffix, recursive, case_sensitive)
 
 
 class Cache:
-
     def __init__(self, capacity):
         self._cache = OrderedDict()
         self._capacity = int(capacity)
         if capacity <= 0:
-            raise ValueError('capacity must be a positive integer')
+            raise ValueError("capacity must be a positive integer")
 
     @property
     def capacity(self):
@@ -143,8 +145,8 @@ class VideoReader:
 
     def __init__(self, filename, cache_capacity=10):
         # Check whether the video path is a url
-        if not filename.startswith(('https://', 'http://')):
-            check_file_exist(filename, 'Video file not found: ' + filename)
+        if not filename.startswith(("https://", "http://")):
+            check_file_exist(filename, "Video file not found: " + filename)
         self._vcap = cv2.VideoCapture(filename)
         assert cache_capacity > 0
         self._cache = Cache(cache_capacity)
@@ -247,8 +249,7 @@ class VideoReader:
             ndarray or None: Return the frame if successful, otherwise None.
         """
         if frame_id < 0 or frame_id >= self._frame_cnt:
-            raise IndexError(
-                f'"frame_id" must be between 0 and {self._frame_cnt - 1}')
+            raise IndexError(f'"frame_id" must be between 0 and {self._frame_cnt - 1}')
         if frame_id == self._position:
             return self.read()
         if self._cache:
@@ -275,13 +276,15 @@ class VideoReader:
             return None
         return self._cache.get(self._position - 1)
 
-    def cvt2frames(self,
-                   frame_dir,
-                   file_start=0,
-                   filename_tmpl='{:06d}.jpg',
-                   start=0,
-                   max_num=0,
-                   show_progress=False):
+    def cvt2frames(
+        self,
+        frame_dir,
+        file_start=0,
+        filename_tmpl="{:06d}.jpg",
+        start=0,
+        max_num=0,
+        show_progress=False,
+    ):
         """Convert a video to frame images.
 
         Args:
@@ -299,7 +302,7 @@ class VideoReader:
         else:
             task_num = min(self.frame_cnt - start, max_num)
         if task_num <= 0:
-            raise ValueError('start must be less than total frame number')
+            raise ValueError("start must be less than total frame number")
         if start > 0:
             self._set_real_position(start)
 
@@ -312,7 +315,7 @@ class VideoReader:
 
         if show_progress:
             pass
-            #track_progress(write_frame, range(file_start,file_start + task_num))
+            # track_progress(write_frame, range(file_start,file_start + task_num))
         else:
             for i in range(task_num):
                 write_frame(file_start + i)
@@ -322,15 +325,12 @@ class VideoReader:
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return [
-                self.get_frame(i)
-                for i in range(*index.indices(self.frame_cnt))
-            ]
+            return [self.get_frame(i) for i in range(*index.indices(self.frame_cnt))]
         # support negative indexing
         if index < 0:
             index += self.frame_cnt
             if index < 0:
-                raise IndexError('index out of range')
+                raise IndexError("index out of range")
         return self.get_frame(index)
 
     def __iter__(self):
@@ -353,14 +353,16 @@ class VideoReader:
         self._vcap.release()
 
 
-def frames2video(frame_dir,
-                 video_file,
-                 fps=30,
-                 fourcc='XVID',
-                 filename_tmpl='{:06d}.jpg',
-                 start=0,
-                 end=0,
-                 show_progress=False):
+def frames2video(
+    frame_dir,
+    video_file,
+    fps=30,
+    fourcc="XVID",
+    filename_tmpl="{:06d}.jpg",
+    start=0,
+    end=0,
+    show_progress=False,
+):
     """Read the frame images from a directory and join them as a video.
 
     Args:
@@ -375,15 +377,14 @@ def frames2video(frame_dir,
         show_progress (bool): Whether to show a progress bar.
     """
     if end == 0:
-        ext = filename_tmpl.split('.')[-1]
+        ext = filename_tmpl.split(".")[-1]
         end = len([name for name in scandir(frame_dir, ext)])
     first_file = osp.join(frame_dir, filename_tmpl.format(start))
-    check_file_exist(first_file, 'The start frame not found: ' + first_file)
+    check_file_exist(first_file, "The start frame not found: " + first_file)
     img = cv2.imread(first_file)
     height, width = img.shape[:2]
     resolution = (width, height)
-    vwriter = cv2.VideoWriter(video_file, VideoWriter_fourcc(*fourcc), fps,
-                              resolution)
+    vwriter = cv2.VideoWriter(video_file, VideoWriter_fourcc(*fourcc), fps, resolution)
 
     def write_frame(file_idx):
         filename = osp.join(frame_dir, filename_tmpl.format(file_idx))
@@ -402,22 +403,22 @@ def frames2video(frame_dir,
 def video2images(video_path, output_dir):
     vidcap = cv2.VideoCapture(video_path)
     in_fps = vidcap.get(cv2.CAP_PROP_FPS)
-    print('video fps:', in_fps)
+    print("video fps:", in_fps)
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
     loaded, frame = vidcap.read()
     total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f'number of total frames is: {total_frames:06}')
+    print(f"number of total frames is: {total_frames:06}")
     for i_frame in range(total_frames):
         if i_frame % 100 == 0:
-            print(f'{i_frame:06} / {total_frames:06}')
-        frame_name = os.path.join(output_dir, f'{i_frame:06}' + '.png')
+            print(f"{i_frame:06} / {total_frames:06}")
+        frame_name = os.path.join(output_dir, f"{i_frame:06}" + ".png")
         cv2.imwrite(frame_name, frame)
         loaded, frame = vidcap.read()
 
 
-def images2video(image_dir, video_path, fps=24, image_ext='png'):
-    '''
+def images2video(image_dir, video_path, fps=24, image_ext="png"):
+    """
     #codec = cv2.VideoWriter_fourcc(*'XVID')
     #codec = cv2.VideoWriter_fourcc('A','V','C','1')
     #codec = cv2.VideoWriter_fourcc('Y','U','V','1')
@@ -433,7 +434,7 @@ def images2video(image_dir, video_path, fps=24, image_ext='png'):
     #codec = cv2.VideoWriter_fourcc('A','Y','U','V')
     #codec = cv2.VideoWriter_fourcc('I','U','Y','V')
     编码器常用的几种：
-    cv2.VideoWriter_fourcc("I", "4", "2", "0") 
+    cv2.VideoWriter_fourcc("I", "4", "2", "0")
         压缩的yuv颜色编码器，4:2:0色彩度子采样 兼容性好，产生很大的视频 avi
     cv2.VideoWriter_fourcc("P", I", "M", "1")
         采用mpeg-1编码，文件为avi
@@ -443,11 +444,13 @@ def images2video(image_dir, video_path, fps=24, image_ext='png'):
         Ogg Vorbis， 拓展名为ogv
     cv2.VideoWriter_fourcc("F", "L", "V", "1")
         FLASH视频，拓展名为.flv
-    '''
-    image_files = sorted(glob.glob(os.path.join(image_dir, '*.{}'.format(image_ext))))
+    """
+    image_files = sorted(glob.glob(os.path.join(image_dir, "*.{}".format(image_ext))))
     print(len(image_files))
     height, width, _ = cv2.imread(image_files[0]).shape
-    out_fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')  # cv2.VideoWriter_fourcc(*'MP4V')
+    out_fourcc = cv2.VideoWriter_fourcc(
+        "M", "J", "P", "G"
+    )  # cv2.VideoWriter_fourcc(*'MP4V')
     out_video = cv2.VideoWriter(video_path, out_fourcc, fps, (width, height))
 
     for image_file in image_files:
@@ -458,25 +461,25 @@ def images2video(image_dir, video_path, fps=24, image_ext='png'):
 
 
 def add_video_compression(imgs):
-    codec_type = ['libx264', 'h264', 'mpeg4']
-    codec_prob = [1 / 3., 1 / 3., 1 / 3.]
+    codec_type = ["libx264", "h264", "mpeg4"]
+    codec_prob = [1 / 3.0, 1 / 3.0, 1 / 3.0]
     codec = random.choices(codec_type, codec_prob)[0]
     # codec = 'mpeg4'
     bitrate = [1e4, 1e5]
     bitrate = np.random.randint(bitrate[0], bitrate[1] + 1)
 
     buf = io.BytesIO()
-    with av.open(buf, 'w', 'mp4') as container:
+    with av.open(buf, "w", "mp4") as container:
         stream = container.add_stream(codec, rate=1)
         stream.height = imgs[0].shape[0]
         stream.width = imgs[0].shape[1]
-        stream.pix_fmt = 'yuv420p'
+        stream.pix_fmt = "yuv420p"
         stream.bit_rate = bitrate
-        
+
         for img in imgs:
-            img = np.uint8((img.clip(0, 1)*255.).round())
-            frame = av.VideoFrame.from_ndarray(img, format='rgb24')
-            frame.pict_type = 'NONE'
+            img = np.uint8((img.clip(0, 1) * 255.0).round())
+            frame = av.VideoFrame.from_ndarray(img, format="rgb24")
+            frame.pict_type = "NONE"
             # pdb.set_trace()
             for packet in stream.encode(frame):
                 container.mux(packet)
@@ -486,70 +489,61 @@ def add_video_compression(imgs):
             container.mux(packet)
 
     outputs = []
-    with av.open(buf, 'r', 'mp4') as container:
+    with av.open(buf, "r", "mp4") as container:
         if container.streams.video:
-            for frame in container.decode(**{'video': 0}):
-                outputs.append(
-                    frame.to_rgb().to_ndarray().astype(np.float32) / 255.)
+            for frame in container.decode(**{"video": 0}):
+                outputs.append(frame.to_rgb().to_ndarray().astype(np.float32) / 255.0)
 
-    #outputs = np.stack(outputs, axis=0)
+    # outputs = np.stack(outputs, axis=0)
     return outputs
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # -----------------------------------
     # test VideoReader(filename, cache_capacity=10)
     # -----------------------------------
-#    video_reader = VideoReader('utils/test.mp4')
-#    from utils import utils_image as util
-#    inputs = []
-#    for frame in video_reader:
-#        print(frame.dtype)
-#        util.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-#        #util.imshow(np.flip(frame, axis=2))
+    #    video_reader = VideoReader('utils/test.mp4')
+    #    from utils import utils_image as util
+    #    inputs = []
+    #    for frame in video_reader:
+    #        print(frame.dtype)
+    #        util.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    #        #util.imshow(np.flip(frame, axis=2))
 
     # -----------------------------------
     # test video2images(video_path, output_dir)
     # -----------------------------------
-#    video2images('utils/test.mp4', 'frames')
+    #    video2images('utils/test.mp4', 'frames')
 
     # -----------------------------------
     # test images2video(image_dir, video_path, fps=24, image_ext='png')
     # -----------------------------------
-#    images2video('frames', 'video_02.mp4', fps=30, image_ext='png')
-
+    #    images2video('frames', 'video_02.mp4', fps=30, image_ext='png')
 
     # -----------------------------------
     # test frames2video(frame_dir, video_file, fps=30, fourcc='XVID', filename_tmpl='{:06d}.png')
     # -----------------------------------
-#    frames2video('frames', 'video_01.mp4', filename_tmpl='{:06d}.png')
-
+    #    frames2video('frames', 'video_01.mp4', filename_tmpl='{:06d}.png')
 
     # -----------------------------------
     # test add_video_compression(imgs)
     # -----------------------------------
-#    imgs = []
-#    image_ext = 'png'
-#    frames = 'frames'
-#    from utils import utils_image as util
-#    image_files = sorted(glob.glob(os.path.join(frames, '*.{}'.format(image_ext))))
-#    for i, image_file in enumerate(image_files):
-#        if i < 7:
-#            img = util.imread_uint(image_file, 3)
-#            img = util.uint2single(img)
-#            imgs.append(img)
-#
-#    results = add_video_compression(imgs)
-#    for i, img in enumerate(results):
-#        util.imshow(util.single2uint(img))
-#        util.imsave(util.single2uint(img),f'{i:05}.png')
+    #    imgs = []
+    #    image_ext = 'png'
+    #    frames = 'frames'
+    #    from utils import utils_image as util
+    #    image_files = sorted(glob.glob(os.path.join(frames, '*.{}'.format(image_ext))))
+    #    for i, image_file in enumerate(image_files):
+    #        if i < 7:
+    #            img = util.imread_uint(image_file, 3)
+    #            img = util.uint2single(img)
+    #            imgs.append(img)
+    #
+    #    results = add_video_compression(imgs)
+    #    for i, img in enumerate(results):
+    #        util.imshow(util.single2uint(img))
+    #        util.imsave(util.single2uint(img),f'{i:05}.png')
 
-    # run utils/utils_video.py
-
-
-
-
-
-
-
+    #    run utils/utils_video.py
+    pass

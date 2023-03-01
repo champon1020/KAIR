@@ -1,25 +1,27 @@
-'''
+"""
 @paper: GAN Prior Embedded Network for Blind Face Restoration in the Wild (CVPR2021)
 @author: yangxy (yangtao9009@gmail.com)
-'''
+"""
 
 
 import sys
-path_retinaface = 'retinaface'
+
+path_retinaface = "retinaface"
 if path_retinaface not in sys.path:
-	sys.path.insert(0, path_retinaface)
+    sys.path.insert(0, path_retinaface)
 
 import os
+import time
+
+import cv2
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import numpy as np
 from data_faces import cfg_re50
-from layers.functions.prior_box import PriorBox
-from utils_faces.nms.py_cpu_nms import py_cpu_nms
-import cv2
 from facemodels.retinaface import RetinaFace
+from layers.functions.prior_box import PriorBox
 from utils_faces.box_utils import decode, decode_landm
-import time
+from utils_faces.nms.py_cpu_nms import py_cpu_nms
 
 
 class RetinaFaceDetection(object):
@@ -29,7 +31,7 @@ class RetinaFaceDetection(object):
         self.pretrained_path = model_path
         self.device = torch.cuda.current_device()
         self.cfg = cfg_re50
-        self.net = RetinaFace(cfg=self.cfg, phase='test')
+        self.net = RetinaFace(cfg=self.cfg, phase="test")
         self.load_model()
         self.net = self.net.cuda()
 
@@ -39,28 +41,43 @@ class RetinaFaceDetection(object):
         used_pretrained_keys = model_keys & ckpt_keys
         unused_pretrained_keys = ckpt_keys - model_keys
         missing_keys = model_keys - ckpt_keys
-        assert len(used_pretrained_keys) > 0, 'load NONE from pretrained checkpoint'
+        assert len(used_pretrained_keys) > 0, "load NONE from pretrained checkpoint"
         return True
 
     def remove_prefix(self, state_dict, prefix):
-        ''' Old style model is stored with all names of parameters sharing common prefix 'module.' '''
+        """Old style model is stored with all names of parameters sharing common prefix 'module.'"""
         f = lambda x: x.split(prefix, 1)[-1] if x.startswith(prefix) else x
         return {f(key): value for key, value in state_dict.items()}
 
     def load_model(self, load_to_cpu=False):
         if load_to_cpu:
-            pretrained_dict = torch.load(self.pretrained_path, map_location=lambda storage, loc: storage)
+            pretrained_dict = torch.load(
+                self.pretrained_path, map_location=lambda storage, loc: storage
+            )
         else:
-            pretrained_dict = torch.load(self.pretrained_path, map_location=lambda storage, loc: storage.cuda())
+            pretrained_dict = torch.load(
+                self.pretrained_path, map_location=lambda storage, loc: storage.cuda()
+            )
         if "state_dict" in pretrained_dict.keys():
-            pretrained_dict = self.remove_prefix(pretrained_dict['state_dict'], 'module.')
+            pretrained_dict = self.remove_prefix(
+                pretrained_dict["state_dict"], "module."
+            )
         else:
-            pretrained_dict = self.remove_prefix(pretrained_dict, 'module.')
+            pretrained_dict = self.remove_prefix(pretrained_dict, "module.")
         self.check_keys(pretrained_dict)
         self.net.load_state_dict(pretrained_dict, strict=False)
         self.net.eval()
-    
-    def detect(self, img_raw, resize=1, confidence_threshold=0.9, nms_threshold=0.4, top_k=5000, keep_top_k=750, save_image=False):
+
+    def detect(
+        self,
+        img_raw,
+        resize=1,
+        confidence_threshold=0.9,
+        nms_threshold=0.4,
+        top_k=5000,
+        keep_top_k=750,
+        save_image=False,
+    ):
         img = np.float32(img_raw)
 
         im_height, im_width = img.shape[:2]
@@ -77,14 +94,25 @@ class RetinaFaceDetection(object):
         priors = priorbox.forward()
         priors = priors.cuda()
         prior_data = priors.data
-        boxes = decode(loc.data.squeeze(0), prior_data, self.cfg['variance'])
+        boxes = decode(loc.data.squeeze(0), prior_data, self.cfg["variance"])
         boxes = boxes * scale / resize
         boxes = boxes.cpu().numpy()
         scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
-        landms = decode_landm(landms.data.squeeze(0), prior_data, self.cfg['variance'])
-        scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                               img.shape[3], img.shape[2], img.shape[3], img.shape[2],
-                               img.shape[3], img.shape[2]])
+        landms = decode_landm(landms.data.squeeze(0), prior_data, self.cfg["variance"])
+        scale1 = torch.Tensor(
+            [
+                img.shape[3],
+                img.shape[2],
+                img.shape[3],
+                img.shape[2],
+                img.shape[3],
+                img.shape[2],
+                img.shape[3],
+                img.shape[2],
+                img.shape[3],
+                img.shape[2],
+            ]
+        )
         scale1 = scale1.cuda()
         landms = landms * scale1 / resize
         landms = landms.cpu().numpy()
@@ -114,11 +142,16 @@ class RetinaFaceDetection(object):
 
         # sort faces(delete)
         fscores = [det[4] for det in dets]
-        sorted_idx = sorted(range(len(fscores)), key=lambda k:fscores[k], reverse=False) # sort index
+        sorted_idx = sorted(
+            range(len(fscores)), key=lambda k: fscores[k], reverse=False
+        )  # sort index
         tmp = [landms[idx] for idx in sorted_idx]
         landms = np.asarray(tmp)
-        
+
         landms = landms.reshape((-1, 5, 2))
         landms = landms.transpose((0, 2, 1))
-        landms = landms.reshape(-1, 10, )
+        landms = landms.reshape(
+            -1,
+            10,
+        )
         return dets, landms

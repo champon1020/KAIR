@@ -1,20 +1,19 @@
-import os.path
 import logging
+import os.path
+from collections import OrderedDict
+from datetime import datetime
 
 import numpy as np
-from datetime import datetime
-from collections import OrderedDict
-
 import torch
 
-from utils import utils_logger
-from utils import utils_model
 from utils import utils_image as util
-#import os
-#os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+from utils import utils_logger, utils_model
+
+# import os
+# os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 
-'''
+"""
 Spyder (Python 3.6)
 PyTorch 1.1.0
 Windows 10 or Linux
@@ -38,7 +37,7 @@ github: https://github.com/cszn/KAIR
 % Kai Zhang (e-mail: cskaizhang@gmail.com; github: https://github.com/cszn)
 
 by Kai Zhang (12/Dec./2019)
-'''
+"""
 
 """
 # --------------------------------------------
@@ -59,43 +58,47 @@ def main():
     # Preparation
     # ----------------------------------------
 
-    model_name = 'dncnn3'     # 'dncnn3'- can be used for blind Gaussian denoising, JPEG deblocking (quality factor 5-100) and super-resolution (x234)
+    model_name = "dncnn3"  # 'dncnn3'- can be used for blind Gaussian denoising, JPEG deblocking (quality factor 5-100) and super-resolution (x234)
 
     # important!
-    testset_name = 'bsd68'    # test set, low-quality grayscale/color JPEG images
-    n_channels = 1            # set 1 for grayscale image, set 3 for color image
+    testset_name = "bsd68"  # test set, low-quality grayscale/color JPEG images
+    n_channels = 1  # set 1 for grayscale image, set 3 for color image
 
-
-    x8 = False                       # default: False, x8 to boost performance
-    testsets = 'testsets'     # fixed
-    results = 'results'       # fixed
-    result_name = testset_name + '_' + model_name # fixed
-    L_path = os.path.join(testsets, testset_name) # L_path, for Low-quality grayscale/Y-channel JPEG images
-    E_path = os.path.join(results, result_name)   # E_path, for Estimated images
+    x8 = False  # default: False, x8 to boost performance
+    testsets = "testsets"  # fixed
+    results = "results"  # fixed
+    result_name = testset_name + "_" + model_name  # fixed
+    L_path = os.path.join(
+        testsets, testset_name
+    )  # L_path, for Low-quality grayscale/Y-channel JPEG images
+    E_path = os.path.join(results, result_name)  # E_path, for Estimated images
     util.mkdir(E_path)
 
-    model_pool = 'model_zoo'  # fixed
-    model_path = os.path.join(model_pool, model_name+'.pth')
+    model_pool = "model_zoo"  # fixed
+    model_path = os.path.join(model_pool, model_name + ".pth")
     logger_name = result_name
-    utils_logger.logger_info(logger_name, log_path=os.path.join(E_path, logger_name+'.log'))
+    utils_logger.logger_info(
+        logger_name, log_path=os.path.join(E_path, logger_name + ".log")
+    )
     logger = logging.getLogger(logger_name)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ----------------------------------------
     # load model
     # ----------------------------------------
 
     from models.network_dncnn import DnCNN as net
-    model = net(in_nc=1, out_nc=1, nc=64, nb=20, act_mode='R')
+
+    model = net(in_nc=1, out_nc=1, nc=64, nb=20, act_mode="R")
     model.load_state_dict(torch.load(model_path), strict=True)
     model.eval()
     for k, v in model.named_parameters():
         v.requires_grad = False
     model = model.to(device)
-    logger.info('Model path: {:s}'.format(model_path))
+    logger.info("Model path: {:s}".format(model_path))
     number_parameters = sum(map(lambda x: x.numel(), model.parameters()))
-    logger.info('Params number: {}'.format(number_parameters))
+    logger.info("Params number: {}".format(number_parameters))
 
     logger.info(L_path)
     L_paths = util.get_image_paths(L_path)
@@ -106,7 +109,7 @@ def main():
         # (1) img_L
         # ------------------------------------
         img_name, ext = os.path.splitext(os.path.basename(img))
-        logger.info('{:->4d}--> {:>10s}'.format(idx+1, img_name+ext))
+        logger.info("{:->4d}--> {:>10s}".format(idx + 1, img_name + ext))
         img_L = util.imread_uint(img, n_channels=n_channels)
         img_L = util.uint2single(img_L)
         if n_channels == 3:
@@ -132,9 +135,9 @@ def main():
         # ------------------------------------
         # save results
         # ------------------------------------
-        util.imsave(img_E, os.path.join(E_path, img_name+'.png'))
+        util.imsave(img_E, os.path.join(E_path, img_name + ".png"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     main()

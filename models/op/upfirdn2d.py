@@ -2,19 +2,19 @@ import os
 
 import torch
 from torch.autograd import Function
-from torch.utils.cpp_extension import load, _import_module_from_library
-
+from torch.utils.cpp_extension import _import_module_from_library, load
 
 module_path = os.path.dirname(__file__)
 upfirdn2d_op = load(
-    'upfirdn2d',
+    "upfirdn2d",
     sources=[
-        os.path.join(module_path, 'upfirdn2d.cpp'),
-        os.path.join(module_path, 'upfirdn2d_kernel.cu'),
+        os.path.join(module_path, "upfirdn2d.cpp"),
+        os.path.join(module_path, "upfirdn2d_kernel.cu"),
     ],
 )
 
-#upfirdn2d_op = _import_module_from_library('upfirdn2d', '/tmp/torch_extensions/upfirdn2d', True)
+# upfirdn2d_op = _import_module_from_library('upfirdn2d', '/tmp/torch_extensions/upfirdn2d', True)
+
 
 class UpFirDn2dBackward(Function):
     @staticmethod
@@ -61,7 +61,7 @@ class UpFirDn2dBackward(Function):
 
     @staticmethod
     def backward(ctx, gradgrad_input):
-        kernel, = ctx.saved_tensors
+        (kernel,) = ctx.saved_tensors
 
         gradgrad_input = gradgrad_input.reshape(-1, ctx.in_size[2], ctx.in_size[3], 1)
 
@@ -185,4 +185,3 @@ def upfirdn2d_native(
     out = out.permute(0, 2, 3, 1)
 
     return out[:, ::down_y, ::down_x, :]
-
