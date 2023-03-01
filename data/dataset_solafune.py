@@ -46,6 +46,8 @@ class DatasetSolafune(data.Dataset):
         # ------------------------------------
         # L/H pairs, HWC to CHW, numpy to tensor
         # ------------------------------------
+        img_H = util.uint2single(img_H)
+        img_L = util.uint2single(img_L)
         img_H, img_L = util.single2tensor3(img_H), util.single2tensor3(img_L)
 
         return {"L": img_L, "H": img_H, "L_path": L_path, "H_path": H_path}
